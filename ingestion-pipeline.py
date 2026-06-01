@@ -203,6 +203,7 @@ def summarise_chunks(chunks):
         doc = Document(
             page_content=enhanced_content,
             metadata={
+                "chunk_id":i, 
                 "original_content": json.dumps({
                     "raw_text": content_data['text'],
                     "tables_html": content_data['tables'],
@@ -244,17 +245,17 @@ def create_vector_store(documents, persist_directory="dbv1/chroma_db"):
 
 
 # Test with your PDF file
-file_path = "./docs/test.pdf"  # Change this to your PDF path
-elements = partition_document(file_path)
+#file_path = "./docs/test.pdf"  # Change this to your PDF path
+#elements = partition_document(file_path)
 
 # Create chunks
-chunks = create_chunks_by_title(elements)
+#chunks = create_chunks_by_title(elements)
 
 # Process chunks with AI
-processed_chunks = summarise_chunks(chunks)
+#processed_chunks = summarise_chunks(chunks)
 
 # Create the vector store
-db = create_vector_store(processed_chunks)
+#db = create_vector_store(processed_chunks)
 
 
 
