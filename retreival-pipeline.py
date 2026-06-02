@@ -1,9 +1,16 @@
+'''
+
+langchain_cohere
+
+'''
+
 from langchain_community.retrievers import BM25Retriever
 from langchain_classic.retrievers import EnsembleRetriever
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage
+from langchain_cohere import CohereRerank
 from dotenv import load_dotenv
 import json
 
@@ -18,7 +25,7 @@ vectorstore = Chroma(
         embedding_function=embedding_model
     )
 
-vector_retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+vector_retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
 
 
 stored_data = vectorstore.get(include=["documents", "metadatas"])
@@ -29,7 +36,7 @@ documents = [
 ]
 
 bm25_retriever = BM25Retriever.from_documents(documents)
-bm25_retriever.k = 3
+bm25_retriever.k = 10
 
 
 hybrid_retriever = EnsembleRetriever(
@@ -41,8 +48,13 @@ hybrid_retriever = EnsembleRetriever(
 
 
 query = "What are the two main components of the Transformer architecture? "
-chunks = hybrid_retriever.invoke(query)
+chunks = hybrid_retriever.invoke(query) 
+print("8"*13)
+print(len(chunks))
+print("8"*13)
 
+reranker = CohereRerank(model="rerank-english-v3.0", top_n=7)
+#chunks = reranker.compress_documents(chunks,query )
 
 
 def generate_final_answer(chunks, query):
@@ -117,6 +129,23 @@ print(final_answer)
 
 
 
+import time
+from cohere.errors import TooManyRequestsError
+
+def rerank_with_retry(docs, query, max_retries=5):
+
+    for attempt in range(max_retries):
+        try:
+            return reranker.compress_documents(docs, query)
+
+        except TooManyRequestsError:
+            wait_time = 60
+            print(f"Rate limited. Sleeping {wait_time}s...")
+            time.sleep(wait_time)
+
+    return docs
+
+
 
 
 def recall_at_k(retriever, evaluation_set, k=3):
@@ -129,6 +158,7 @@ def recall_at_k(retriever, evaluation_set, k=3):
         expected_ids = set(item["expected_chunk_ids"])
 
         retrieved_docs = retriever.invoke(question)
+        retrieved_docs = rerank_with_retry(retrieved_docs,item["question"] )
         retrieved_docs = retrieved_docs[:k]
 
         retrieved_ids = {
@@ -156,6 +186,7 @@ def mean_reciprocal_rank(retriever, evaluation_set):
         expected_ids = set(item["expected_chunk_ids"])
 
         docs = retriever.invoke(item["question"])
+        docs = rerank_with_retry(docs,item["question"] )
 
         rr = 0
 
@@ -172,7 +203,7 @@ def mean_reciprocal_rank(retriever, evaluation_set):
 
 
 
-evaluation_set2 = [
+evaluation_set = [
     {
         "question": "What architecture did the Transformer introduce to replace recurrent and convolutional networks in sequence transduction tasks?",
         "expected_chunk_ids": [1]
@@ -275,7 +306,7 @@ evaluation_set2 = [
     }
 ]
 
-evaluation_set = [
+evaluation_set2 = [
     {
         "question": "What is the title of the paper that introduced the Transformer architecture?",
         "expected_chunk_ids": [0]
